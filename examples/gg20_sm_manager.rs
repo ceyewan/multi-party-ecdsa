@@ -166,7 +166,9 @@ impl<'r> FromRequest<'r> for LastEventId {
         match header {
             Some(Ok(last_seen_msg)) => Outcome::Success(LastEventId(Some(last_seen_msg))),
             Some(Err(_parse_err)) => {
-                Outcome::Failure((Status::BadRequest, "last seen msg id is not valid"))
+                // 打印错误信息
+                eprintln!("Failed to parse Last-Event-ID header");
+                Outcome::Success(LastEventId(None))
             }
             None => Outcome::Success(LastEventId(None)),
         }
@@ -183,7 +185,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let figment = rocket::Config::figment().merge((
         "limits",
         rocket::data::Limits::new().limit("string", 100.megabytes()),
-    ));
+    ))
+    .merge(("address", "0.0.0.0"))
+    .merge(("port", 8000));
     rocket::custom(figment)
         .mount("/", rocket::routes![subscribe, issue_idx, broadcast])
         .manage(Db::empty())
