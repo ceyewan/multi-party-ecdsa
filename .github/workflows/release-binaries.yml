@@ -27,12 +27,12 @@ jobs:
             artifact: darwin_arm64
             ext: ""
             archive_ext: tar.gz
-            examples: "gg20_keygen gg20_signing"
+            examples: "gg20_sm_manager gg20_keygen gg20_signing"
           - os: windows-latest
             artifact: windows_amd64
             ext: ".exe"
             archive_ext: zip
-            examples: "gg20_keygen gg20_signing"
+            examples: "gg20_sm_manager gg20_keygen gg20_signing"
 
     steps:
       - uses: actions/checkout@v4

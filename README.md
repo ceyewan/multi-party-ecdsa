@@ -115,8 +115,8 @@ cargo build --release --examples --no-default-features --features curv-kzen/num-
 The workflow uploads these artifacts:
 
 - `gg20_linux_amd64.tar.gz`: `gg20_sm_manager_linux_amd64`, `gg20_keygen_linux_amd64`, `gg20_signing_linux_amd64`
-- `gg20_darwin_arm64.tar.gz`: `gg20_keygen_darwin_arm64`, `gg20_signing_darwin_arm64`
-- `gg20_windows_amd64.zip`: `gg20_keygen_windows_amd64.exe`, `gg20_signing_windows_amd64.exe`
+- `gg20_darwin_arm64.tar.gz`: `gg20_sm_manager_darwin_arm64`, `gg20_keygen_darwin_arm64`, `gg20_signing_darwin_arm64`
+- `gg20_windows_amd64.zip`: `gg20_sm_manager_windows_amd64.exe`, `gg20_keygen_windows_amd64.exe`, `gg20_signing_windows_amd64.exe`
 
 After downloading and extracting an artifact, run the smoke test from this repository:
 
