@@ -18,6 +18,36 @@ pub async fn join_computation<M>(
 where
     M: Serialize + DeserializeOwned,
 {
+    join_computation_impl(address, room_id, None).await
+}
+
+pub async fn join_computation_with_index<M>(
+    address: surf::Url,
+    room_id: &str,
+    index: u16,
+) -> Result<(
+    u16,
+    impl Stream<Item = Result<Msg<M>>>,
+    impl Sink<Msg<M>, Error = anyhow::Error>,
+)>
+where
+    M: Serialize + DeserializeOwned,
+{
+    join_computation_impl(address, room_id, Some(index)).await
+}
+
+async fn join_computation_impl<M>(
+    address: surf::Url,
+    room_id: &str,
+    protocol_index: Option<u16>,
+) -> Result<(
+    u16,
+    impl Stream<Item = Result<Msg<M>>>,
+    impl Sink<Msg<M>, Error = anyhow::Error>,
+)>
+where
+    M: Serialize + DeserializeOwned,
+{
     let client = SmClient::new(address, room_id).context("construct SmClient")?;
 
     // Construct channel of incoming messages
@@ -30,7 +60,8 @@ where
         });
 
     // Obtain party index
-    let index = client.issue_index().await.context("issue an index")?;
+    let issued_index = client.issue_index().await.context("issue an index")?;
+    let index = protocol_index.unwrap_or(issued_index);
 
     // Ignore incoming messages addressed to someone else
     let incoming = incoming.try_filter(move |msg| {

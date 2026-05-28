@@ -73,21 +73,13 @@ impl Db {
     pub async fn get_room_or_create_empty(&self, room_id: &str) -> Arc<Room> {
         let rooms = self.rooms.read().await;
         if let Some(room) = rooms.get(room_id) {
-            // If no one is watching this room - we need to clean it up first
-            if !room.is_abandoned() {
-                return room.clone();
-            }
+            return room.clone();
         }
         drop(rooms);
 
         let mut rooms = self.rooms.write().await;
         match rooms.entry(room_id.to_owned()) {
-            Entry::Occupied(entry) if !entry.get().is_abandoned() => entry.get().clone(),
-            Entry::Occupied(entry) => {
-                let room = Arc::new(Room::empty());
-                *entry.into_mut() = room.clone();
-                room
-            }
+            Entry::Occupied(entry) => entry.get().clone(),
             Entry::Vacant(entry) => entry.insert(Arc::new(Room::empty())).clone(),
         }
     }
@@ -115,10 +107,6 @@ impl Room {
             room: self,
             next_event: last_seen_msg.map(|i| i + 1).unwrap_or(0),
         }
-    }
-
-    pub fn is_abandoned(&self) -> bool {
-        self.subscribers.load(Ordering::SeqCst) == 0
     }
 
     pub fn issue_unique_idx(&self) -> u16 {

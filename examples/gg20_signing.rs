@@ -14,7 +14,7 @@ use round_based::async_runtime::AsyncProtocol;
 use round_based::Msg;
 
 mod gg20_sm_client;
-use gg20_sm_client::join_computation;
+use gg20_sm_client::join_computation_with_index;
 
 #[derive(Debug, StructOpt)]
 struct Cli {
@@ -24,6 +24,8 @@ struct Cli {
     room: String,
     #[structopt(short, long)]
     local_share: PathBuf,
+    #[structopt(short, long)]
+    index: u16,
 
     #[structopt(short, long, use_delimiter(true))]
     parties: Vec<u16>,
@@ -40,10 +42,13 @@ async fn main() -> Result<()> {
     let local_share = serde_json::from_slice(&local_share).context("parse local share")?;
     let number_of_parties = args.parties.len();
 
-    let (i, incoming, outgoing) =
-        join_computation(args.address.clone(), &format!("{}-offline", args.room))
-            .await
-            .context("join offline computation")?;
+    let (i, incoming, outgoing) = join_computation_with_index(
+        args.address.clone(),
+        &format!("{}-offline", args.room),
+        args.index,
+    )
+    .await
+    .context("join offline computation")?;
 
     let incoming = incoming.fuse();
     tokio::pin!(incoming);
@@ -55,9 +60,10 @@ async fn main() -> Result<()> {
         .await
         .map_err(|e| anyhow!("protocol execution terminated with error: {}", e))?;
 
-    let (_i, incoming, outgoing) = join_computation(args.address, &format!("{}-online", args.room))
-        .await
-        .context("join online computation")?;
+    let (_i, incoming, outgoing) =
+        join_computation_with_index(args.address, &format!("{}-online", args.room), args.index)
+            .await
+            .context("join online computation")?;
 
     tokio::pin!(incoming);
     tokio::pin!(outgoing);

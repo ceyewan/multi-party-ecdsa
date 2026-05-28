@@ -121,10 +121,12 @@ The workflow uploads these artifacts:
 After downloading and extracting an artifact, run the smoke test from this repository:
 
 ```bash
-go run scripts/gg20_smoke.go --bin-dir /path/to/extracted-binaries --port 18001
+go run scripts/gg20_smoke.go --bin-dir /path/to/extracted-binaries --port 18001 --iterations 10
 ```
 
-The smoke test starts a manager process, runs 3-party keygen, then runs 2-party signing. It staggers party startup slightly so the manager-issued party indexes match the generated local shares.
+Each iteration starts with a fresh 3-party keygen, then tests signing with parties `1,2`, `2,3`, `1,3`, and `1,2,3`. The smoke test staggers party startup slightly so the manager-issued party indexes match the generated local shares.
+
+For signing, `--parties` contains the keygen party indexes participating in the signature, while `--index` is the current process's 1-based position in that signing subset. For example, when signing with `--parties 2,3`, party 2 runs with `--index 1` and party 3 runs with `--index 2`.
 
 ## Run GG18 Demo
 

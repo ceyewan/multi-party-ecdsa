@@ -31,7 +31,8 @@ func main() {
 		bindAddress = flag.String("bind-address", "127.0.0.1", "address passed to gg20_sm_manager --address")
 		port        = flag.Int("port", 18001, "port passed to gg20_sm_manager --port")
 		managerURL  = flag.String("manager-url", "", "client URL for the manager; defaults to http://127.0.0.1:<port>/")
-		timeout     = flag.Duration("timeout", 2*time.Minute, "overall timeout for keygen and signing")
+		iterations  = flag.Int("iterations", 1, "number of full keygen/signing test iterations to run")
+		timeout     = flag.Duration("timeout", 20*time.Minute, "overall timeout for all keygen and signing iterations")
 		startDelay  = flag.Duration("party-start-delay", 500*time.Millisecond, "delay between starting party processes so manager-issued indexes match share indexes")
 		keep        = flag.Bool("keep", false, "keep the work directory after a successful run")
 		managerPath = flag.String("manager", "", "explicit path to gg20_sm_manager binary")
@@ -42,6 +43,9 @@ func main() {
 
 	if *managerURL == "" {
 		*managerURL = fmt.Sprintf("http://127.0.0.1:%d/", *port)
+	}
+	if *iterations < 1 {
+		fail("--iterations must be at least 1")
 	}
 
 	manager, err := resolveBinary(*binDir, *managerPath, "gg20_sm_manager")
@@ -67,6 +71,7 @@ func main() {
 	fmt.Printf("  signing: %s\n", signing)
 	fmt.Printf("  url:     %s\n", *managerURL)
 	fmt.Printf("  work:    %s\n", dir)
+	fmt.Printf("  rounds:  %d\n", *iterations)
 
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
@@ -89,37 +94,50 @@ func main() {
 	must("wait for manager", waitForManager(ctx, *managerURL, managerDone, managerLog))
 	fmt.Println("manager is ready")
 
-	roomSuffix := fmt.Sprintf("%d", time.Now().UnixNano())
-	keygenRoom := "smoke-keygen-" + roomSuffix
-	shares := []string{
-		filepath.Join(dir, "local-share1.json"),
-		filepath.Join(dir, "local-share2.json"),
-		filepath.Join(dir, "local-share3.json"),
+	signingCases := []signingCase{
+		{name: "parties-1-2", parties: []int{1, 2}},
+		{name: "parties-2-3", parties: []int{2, 3}},
+		{name: "parties-1-3", parties: []int{1, 3}},
+		{name: "parties-1-2-3", parties: []int{1, 2, 3}},
 	}
 
-	keygenResults := runParallel(ctx, *startDelay, []namedCommand{
-		{name: "keygen-party-1", path: keygen, args: []string{"--address", *managerURL, "--room", keygenRoom, "--output", shares[0], "--index", "1", "--threshold", "1", "--number-of-parties", "3"}},
-		{name: "keygen-party-2", path: keygen, args: []string{"--address", *managerURL, "--room", keygenRoom, "--output", shares[1], "--index", "2", "--threshold", "1", "--number-of-parties", "3"}},
-		{name: "keygen-party-3", path: keygen, args: []string{"--address", *managerURL, "--room", keygenRoom, "--output", shares[2], "--index", "3", "--threshold", "1", "--number-of-parties", "3"}},
-	})
-	mustResults("keygen", keygenResults)
-	for _, share := range shares {
-		must("verify share "+share, requireNonEmptyFile(share))
-	}
-	fmt.Println("keygen completed")
+	for iteration := 1; iteration <= *iterations; iteration++ {
+		fmt.Printf("iteration %d/%d: keygen\n", iteration, *iterations)
+		iterDir := filepath.Join(dir, fmt.Sprintf("iteration-%02d", iteration))
+		must("create iteration directory", os.MkdirAll(iterDir, 0o755))
 
-	signRoom := "smoke-sign-" + roomSuffix
-	signResults := runParallel(ctx, *startDelay, []namedCommand{
-		{name: "sign-party-1", path: signing, args: []string{"--address", *managerURL, "--room", signRoom, "--local-share", shares[0], "--parties", "1,2", "--data-to-sign", "offline-system-smoke-test"}},
-		{name: "sign-party-2", path: signing, args: []string{"--address", *managerURL, "--room", signRoom, "--local-share", shares[1], "--parties", "1,2", "--data-to-sign", "offline-system-smoke-test"}},
-	})
-	mustResults("signing", signResults)
-	for _, result := range signResults {
-		if !strings.Contains(result.output, "r") || !strings.Contains(result.output, "s") {
-			fail("%s did not print a JSON-like ECDSA signature:\n%s", result.name, result.output)
+		roomSuffix := fmt.Sprintf("%d-%d", time.Now().UnixNano(), iteration)
+		keygenRoom := "smoke-keygen-" + roomSuffix
+		shares := []string{
+			filepath.Join(iterDir, "local-share1.json"),
+			filepath.Join(iterDir, "local-share2.json"),
+			filepath.Join(iterDir, "local-share3.json"),
+		}
+
+		keygenResults := runParallel(ctx, *startDelay, []namedCommand{
+			{name: "keygen-party-1", path: keygen, args: []string{"--address", *managerURL, "--room", keygenRoom, "--output", shares[0], "--index", "1", "--threshold", "1", "--number-of-parties", "3"}},
+			{name: "keygen-party-2", path: keygen, args: []string{"--address", *managerURL, "--room", keygenRoom, "--output", shares[1], "--index", "2", "--threshold", "1", "--number-of-parties", "3"}},
+			{name: "keygen-party-3", path: keygen, args: []string{"--address", *managerURL, "--room", keygenRoom, "--output", shares[2], "--index", "3", "--threshold", "1", "--number-of-parties", "3"}},
+		})
+		mustResults("keygen", keygenResults)
+		for _, share := range shares {
+			must("verify share "+share, requireNonEmptyFile(share))
+		}
+		fmt.Printf("iteration %d/%d: keygen completed\n", iteration, *iterations)
+
+		for _, testCase := range signingCases {
+			signRoom := fmt.Sprintf("smoke-sign-%s-%s", roomSuffix, testCase.name)
+			fmt.Printf("iteration %d/%d: signing %s\n", iteration, *iterations, testCase.partyList())
+			signResults := runParallel(ctx, *startDelay, signingCommands(signing, *managerURL, signRoom, shares, testCase, iteration))
+			mustResults("signing "+testCase.partyList(), signResults)
+			for _, result := range signResults {
+				if !strings.Contains(result.output, "r") || !strings.Contains(result.output, "s") {
+					fail("%s did not print a JSON-like ECDSA signature:\n%s", result.name, result.output)
+				}
+			}
+			fmt.Printf("iteration %d/%d: signing %s completed\n", iteration, *iterations, testCase.partyList())
 		}
 	}
-	fmt.Println("signing completed")
 
 	if !*keep && *workDir == "" {
 		_ = os.RemoveAll(dir)
@@ -129,10 +147,43 @@ func main() {
 	fmt.Println("GG20 smoke test passed")
 }
 
+type signingCase struct {
+	name    string
+	parties []int
+}
+
+func (c signingCase) partyList() string {
+	parts := make([]string, 0, len(c.parties))
+	for _, party := range c.parties {
+		parts = append(parts, fmt.Sprint(party))
+	}
+	return strings.Join(parts, ",")
+}
+
 type namedCommand struct {
 	name string
 	path string
 	args []string
+}
+
+func signingCommands(signing, managerURL, room string, shares []string, testCase signingCase, iteration int) []namedCommand {
+	commands := make([]namedCommand, 0, len(testCase.parties))
+	partyList := testCase.partyList()
+	for position, party := range testCase.parties {
+		commands = append(commands, namedCommand{
+			name: fmt.Sprintf("sign-party-%d-with-%s", party, strings.ReplaceAll(partyList, ",", "-")),
+			path: signing,
+			args: []string{
+				"--address", managerURL,
+				"--room", room,
+				"--local-share", shares[party-1],
+				"--index", fmt.Sprint(position + 1),
+				"--parties", partyList,
+				"--data-to-sign", fmt.Sprintf("offline-system-smoke-test-%02d-%s", iteration, strings.ReplaceAll(partyList, ",", "-")),
+			},
+		})
+	}
+	return commands
 }
 
 func runParallel(ctx context.Context, startDelay time.Duration, commands []namedCommand) []commandResult {

@@ -7,7 +7,7 @@ use multi_party_ecdsa::protocols::multi_party_ecdsa::gg_2020::state_machine::key
 use round_based::async_runtime::AsyncProtocol;
 
 mod gg20_sm_client;
-use gg20_sm_client::join_computation;
+use gg20_sm_client::join_computation_with_index;
 
 #[derive(Debug, StructOpt)]
 struct Cli {
@@ -36,9 +36,10 @@ async fn main() -> Result<()> {
         .await
         .context("cannot create output file")?;
 
-    let (_i, incoming, outgoing) = join_computation(args.address, &args.room)
-        .await
-        .context("join computation")?;
+    let (_i, incoming, outgoing) =
+        join_computation_with_index(args.address, &args.room, args.index)
+            .await
+            .context("join computation")?;
 
     let incoming = incoming.fuse();
     tokio::pin!(incoming);
