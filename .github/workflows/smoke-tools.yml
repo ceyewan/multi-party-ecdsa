@@ -2,9 +2,14 @@ name: Smoke tools
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Optional existing release tag to upload smoke tools to, for example v0.8.1-gg20.3"
+        required: false
+        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -51,3 +56,16 @@ jobs:
             dist/smoke/gg20_smoke_${{ matrix.artifact }}${{ matrix.ext }}
             dist/smoke/gg20_smoke_${{ matrix.artifact }}${{ matrix.ext }}.sha256
           if-no-files-found: error
+
+      - name: Upload to GitHub release
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" \
+            "dist/smoke/gg20_smoke_${{ matrix.artifact }}${{ matrix.ext }}" \
+            "dist/smoke/gg20_smoke_${{ matrix.artifact }}${{ matrix.ext }}.sha256" \
+            --clobber
