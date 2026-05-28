@@ -1,0 +1,53 @@
+name: Smoke tools
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - artifact: windows_amd64
+            goos: windows
+            goarch: amd64
+            ext: .exe
+          - artifact: linux_amd64
+            goos: linux
+            goarch: amd64
+            ext: ""
+          - artifact: darwin_arm64
+            goos: darwin
+            goarch: arm64
+            ext: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
+      - name: Build smoke binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/smoke
+          output="dist/smoke/gg20_smoke_${{ matrix.artifact }}${{ matrix.ext }}"
+          GOOS="${{ matrix.goos }}" GOARCH="${{ matrix.goarch }}" CGO_ENABLED=0 \
+            go build -trimpath -ldflags="-s -w" -o "$output" scripts/gg20_smoke.go
+          sha256sum "$output" > "$output.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gg20_smoke_${{ matrix.artifact }}
+          path: |
+            dist/smoke/gg20_smoke_${{ matrix.artifact }}${{ matrix.ext }}
+            dist/smoke/gg20_smoke_${{ matrix.artifact }}${{ matrix.ext }}.sha256
+          if-no-files-found: error
