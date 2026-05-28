@@ -118,6 +118,14 @@ The workflow uploads these artifacts:
 - `gg20_darwin_arm64.tar.gz`: `gg20_keygen_darwin_arm64`, `gg20_signing_darwin_arm64`
 - `gg20_windows_amd64.zip`: `gg20_keygen_windows_amd64.exe`, `gg20_signing_windows_amd64.exe`
 
+After downloading and extracting an artifact, run the smoke test from this repository:
+
+```bash
+go run scripts/gg20_smoke.go --bin-dir /path/to/extracted-binaries --port 18001
+```
+
+The smoke test starts a manager process, runs 3-party keygen, then runs 2-party signing. It staggers party startup slightly so the manager-issued party indexes match the generated local shares.
+
 ## Run GG18 Demo
 
 The following steps are for setup, key generation with `n` parties and signing with `t+1` parties.
