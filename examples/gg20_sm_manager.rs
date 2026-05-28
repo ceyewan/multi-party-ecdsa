@@ -1,4 +1,5 @@
 use std::collections::hash_map::{Entry, HashMap};
+use std::net::IpAddr;
 use std::sync::{
     atomic::{AtomicU16, Ordering},
     Arc,
@@ -12,6 +13,7 @@ use rocket::response::stream::{stream, Event, EventStream};
 use rocket::serde::json::Json;
 use rocket::State;
 use serde::{Deserialize, Serialize};
+use structopt::StructOpt;
 use tokio::sync::{Notify, RwLock};
 
 #[rocket::get("/rooms/<room_id>/subscribe")]
@@ -180,14 +182,24 @@ struct IssuedUniqueIdx {
     unique_idx: u16,
 }
 
+#[derive(Debug, StructOpt)]
+struct Cli {
+    #[structopt(long, default_value = "0.0.0.0")]
+    address: IpAddr,
+    #[structopt(long, default_value = "8000")]
+    port: u16,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let figment = rocket::Config::figment().merge((
-        "limits",
-        rocket::data::Limits::new().limit("string", 100.megabytes()),
-    ))
-    .merge(("address", "0.0.0.0"))
-    .merge(("port", 8000));
+    let args = Cli::from_args();
+    let figment = rocket::Config::figment()
+        .merge((
+            "limits",
+            rocket::data::Limits::new().limit("string", 100.megabytes()),
+        ))
+        .merge(("address", args.address))
+        .merge(("port", args.port));
     rocket::custom(figment)
         .mount("/", rocket::routes![subscribe, issue_idx, broadcast])
         .manage(Db::empty())

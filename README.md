@@ -65,6 +65,12 @@ That will start an HTTP server on `http://127.0.0.1:8000`. Other parties will us
 each other. Note that communication channels are neither encrypted nor authenticated. In production, you must encrypt and
 authenticate parties messages.
 
+You can also bind the GG20 state machine manager to a specific interface and port:
+
+```bash
+./gg20_sm_manager --address 0.0.0.0 --port 18001
+```
+
 ### Run Keygen
 
 Open 3 terminal tabs for each party. Run:
@@ -96,6 +102,21 @@ run each party on dedicated machine. To do this, you should ensure that parties 
 SM Server, and specify its address via command line argument, eg:
 
 `./gg20_keygen --address http://10.0.1.9:8000/ ...`
+
+## Build GG20 Release Binaries
+
+The `Release binaries` GitHub Actions workflow can be run manually, or by pushing a tag like `v0.8.1-gg20.1`.
+It builds GG20 examples without GMP by using:
+
+```bash
+cargo build --release --examples --no-default-features --features curv-kzen/num-bigint --locked
+```
+
+The workflow uploads these artifacts:
+
+- `gg20_linux_amd64.tar.gz`: `gg20_sm_manager_linux_amd64`, `gg20_keygen_linux_amd64`, `gg20_signing_linux_amd64`
+- `gg20_darwin_arm64.tar.gz`: `gg20_keygen_darwin_arm64`, `gg20_signing_darwin_arm64`
+- `gg20_windows_amd64.zip`: `gg20_keygen_windows_amd64.exe`, `gg20_signing_windows_amd64.exe`
 
 ## Run GG18 Demo
 
