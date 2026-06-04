@@ -68,10 +68,8 @@ async fn main() -> Result<()> {
     tokio::pin!(incoming);
     tokio::pin!(outgoing);
 
-    let (signing, partial_signature) = SignManual::new(
-        BigInt::from_bytes(args.data_to_sign.as_bytes()),
-        completed_offline_stage,
-    )?;
+    let data_to_sign = parse_data_to_sign(&args.data_to_sign)?;
+    let (signing, partial_signature) = SignManual::new(data_to_sign, completed_offline_stage)?;
 
     outgoing
         .send(Msg {
@@ -93,4 +91,23 @@ async fn main() -> Result<()> {
     println!("{}", signature);
 
     Ok(())
+}
+
+fn parse_data_to_sign(data: &str) -> Result<BigInt> {
+    let trimmed = data.trim();
+    let hex_text = trimmed.strip_prefix("0x").unwrap_or(trimmed);
+    if trimmed.starts_with("0x") || (hex_text.len() == 64 && is_hex(hex_text)) {
+        if hex_text.len() % 2 != 0 {
+            return Err(anyhow!(
+                "hex data-to-sign must have an even number of characters"
+            ));
+        }
+        let bytes = hex::decode(hex_text).context("decode hex data-to-sign")?;
+        return Ok(BigInt::from_bytes(&bytes));
+    }
+    Ok(BigInt::from_bytes(trimmed.as_bytes()))
+}
+
+fn is_hex(value: &str) -> bool {
+    value.as_bytes().iter().all(|b| b.is_ascii_hexdigit())
 }

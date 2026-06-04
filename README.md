@@ -95,6 +95,10 @@ who attends in signing (each party has an associated index given at keygen, see 
 `-i`), `-l file.json` sets a path to a file with secret local share, and `-d "hello"`
 is a message being signed.
 
+For Ethereum-style signing, pass a 32-byte message hash as either `0x`-prefixed hex or
+64-character hex. In that case, `gg20_signing` signs the decoded hash bytes, not the
+ASCII characters of the hex string.
+
 ### Running Demo on different computers
 
 While previous steps show how to run keygen & signing on local computer, you actually can
@@ -124,7 +128,7 @@ After downloading and extracting an artifact, run the smoke test from this repos
 go run scripts/gg20_smoke.go --bin-dir /path/to/extracted-binaries --port 18001 --iterations 10
 ```
 
-Each iteration starts with a fresh 3-party keygen, then tests signing with parties `1,2`, `2,3`, `1,3`, and `1,2,3`. The smoke test staggers party startup slightly so the manager-issued party indexes match the generated local shares.
+Each iteration starts with a fresh 3-party keygen, then tests signing with parties `1,2`, `2,3`, `1,3`, and `1,2,3`. The smoke test staggers party startup slightly so the manager-issued party indexes match the generated local shares. It verifies each signature with standard ECDSA and Ethereum public key recovery against the keygen address.
 
 For signing, `--parties` contains the keygen party indexes participating in the signature, while `--index` is the current process's 1-based position in that signing subset. For example, when signing with `--parties 2,3`, party 2 runs with `--index 1` and party 3 runs with `--index 2`.
 
